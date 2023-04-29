@@ -33,7 +33,6 @@ def create_vm_by_ref(request: HttpRequest):
     # Выполнение команды клонирования виртуальной машины
     result = kvm.clone_vm(reference.domain, new_domain)
 
-    print(result)
     if result.returncode == 0:
         node = models.Node(title=new_domain, lab=lab)
         node.save()
@@ -47,7 +46,6 @@ def create_vm_by_ref(request: HttpRequest):
 
 @csrf_exempt   
 def delete_vm(request: HttpRequest):
-    print(request.method)
     if request.method != "DELETE":
         return JsonResponse({'status': 'error', 'message': "Only DELETE method required!"})
     json_params = json.loads(request.body)
@@ -63,4 +61,59 @@ def delete_vm(request: HttpRequest):
     else:
         # Если произошла ошибка при удалении, вернуть статус 500 и сообщение об ошибке
         return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
+    
+@csrf_exempt   
+def get_vm_status(request: HttpRequest):
+    if request.method != "GET":
+        return JsonResponse({'status': 'error', 'message': "Only GET method required!"})
 
+    vm_id = int(request.GET["id"])
+    vm = models.VirtualMachine.objects.get(pk=vm_id)
+    result = kvm.get_vm_status(vm.domain)
+    print(result)
+    return JsonResponse({'id': vm.pk, 'domain': vm.domain, "status": result})
+
+@csrf_exempt   
+def start_vm(request: HttpRequest):
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': "Only POST method required!"})
+    json_params = json.loads(request.body)
+    vm_id = int(json_params["id"])
+
+    vm = models.VirtualMachine.objects.get(pk=vm_id)
+    result = kvm.start_vm(vm.domain)
+    print(result)
+    if result.returncode == 0:
+        return JsonResponse({'status': 'success', 'message': f'VM {vm.domain} has been started'})
+    else:
+        return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
+    
+@csrf_exempt   
+def shutdown_vm(request: HttpRequest):
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': "Only POST method required!"})
+    json_params = json.loads(request.body)
+    vm_id = int(json_params["id"])
+
+    vm = models.VirtualMachine.objects.get(pk=vm_id)
+    result = kvm.shutdown_vm(vm.domain)
+    print(result)
+    if result.returncode == 0:
+        return JsonResponse({'status': 'success', 'message': f'VM {vm.domain} has been shutdown'})
+    else:
+        return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
+    
+@csrf_exempt   
+def forceoff_vm(request: HttpRequest):
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': "Only POST method required!"})
+    json_params = json.loads(request.body)
+    vm_id = int(json_params["id"])
+
+    vm = models.VirtualMachine.objects.get(pk=vm_id)
+    result = kvm.forceoff_vm(vm.domain)
+    print(result)
+    if result.returncode == 0:
+        return JsonResponse({'status': 'success', 'message': f'VM {vm.domain} has been destroyed'})
+    else:
+        return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
