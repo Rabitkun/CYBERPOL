@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    {% load static %}
+    <script src="{% static 'js/jquery-3.6.4.min.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <title>{{lab_title}}</title>
+  </head>
+  <body>
+    {% block content %}{% endblock %}
+    <div class="movable labnode" position-x="400" position-y="200" node-id="1">
+      <div class="nodepicture"  style="background-image: url({% static 'micons\router-svgrepo-com.svg' %});" alt="Node"></div>
+      <p class="nodetitle">Node 1</p>
+    </div>
+    <div class="movable labnode" position-x="500" position-y="240" node-id="2">
+      <div class="nodepicture"  style="background-image: url({% static 'micons\router-svgrepo-com.svg' %});" alt="Node"></div>
+      <p class="nodetitle">Node 2</p>
+    </div>
+    <div class="movable labnode" position-x="500" position-y="240" node-id="3">
+      <div class="nodepicture"  style="background-image: url({% static 'micons\router-svgrepo-com.svg' %});" alt="Node"></div>
+      <p class="nodetitle">Node 3</p>
+    </div>
+    <div class="movable labnode" position-x="500" position-y="240" node-id="4">
+      <div class="nodepicture"  style="background-image: url({% static 'micons\router-svgrepo-com.svg' %});" alt="Node"></div>
+      <p class="nodetitle">Node 4</p>
+    </div>
+    <div class="movable labnode" position-x="500" position-y="240" node-id="5">
+      <div class="nodepicture"  style="background-image: url({% static 'micons\router-svgrepo-com.svg' %});" alt="Node"></div>
+      <p class="nodetitle">Node 5</p>
+    </div>
+    
+    <div class='nodebridge' node-a="1" node-b="2" bridge-id="1" eth-a="1" eth-b="1">
+      <div class="line"></div>
+    </div>
+    <div class='nodebridge' node-a="2" node-b="3" bridge-id="2" eth-a="1" eth-b="1">
+      <div class="line"></div>
+    </div>
+    <div class='nodebridge' node-a="2" node-b="4" bridge-id="3" eth-a="1" eth-b="1">
+      <div class="line"></div>
+    </div>
+    <div class='nodebridge' node-a="4" node-b="5" bridge-id="4" eth-a="1" eth-b="1">
+      <div class="line"></div>
+    </div>
+  </body>
+  <script src="{% static 'js/rest.js' %}"></script>
+  <script src="{% static 'js/dialogs.js' %}"></script>
+  <script src="{% static 'js/main.js' %}"></script>
+  <script src="{% static 'js/lab.js' %}"></script>
+</html>

@@ -2,6 +2,7 @@ import subprocess
 from subprocess import CompletedProcess
 from django.views.decorators.csrf import csrf_exempt
 from . import models, kvm
+from django.db.models import Q
 from django.http import JsonResponse, HttpRequest
 import json
 
@@ -11,10 +12,72 @@ def get_vms_list(request: HttpRequest):
     resp = {}
     for vm in vms:
         resp[vm.pk] = {
+            "node": vm.node.pk,
             "domain": vm.domain,
             "reference": vm.reference.domain
         }
     return JsonResponse(resp)
+
+@csrf_exempt
+def get_node_params(request: HttpRequest):
+    if request.method != "GET":
+        return JsonResponse({'status': 'error', 'message': "Only GET method required!"})
+    node_id = int(request.GET["id"])
+    node = models.Node.objects.get(pk=node_id)
+    response = {
+        "id": node_id,
+        "title": node.title,
+        "type": node.type,
+        "type-text": models.NodeType(node.type).name,
+        "lab": node.lab.pk,
+        "lab-title": node.lab.title,
+    }
+    if(node.type == models.NodeType.VIRTUALMACHINE):
+        vm = models.VirtualMachine.objects.get(node=node)
+        response["reference"] = vm.reference.domain
+        response["cpus"] = vm.cpus
+        response["ram"] = vm.ramMB
+        response["interfaces"] = vm.interfaces
+
+    return JsonResponse(response)
+
+@csrf_exempt
+def create_cloud_node(request: HttpRequest):
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': "Only POST method required!"})
+    json_params = json.loads(request.body)
+    lab_id = int(request.COOKIES['lab_id'])
+    pos_x = int(json_params["pos_x"])
+    pox_y = int(json_params["pos_y"])
+    title = json_params["title"]
+
+    lab = models.Lab.objects.get(pk=lab_id)
+    node = models.Node()
+    node.lab = lab
+    node.posX, node.posY = pos_x, pox_y
+    node.title = title
+    node.iconPath = "cloud-svgrepo-com.svg"
+    node.type = models.NodeType.CLOUD
+    node.save()
+    return JsonResponse({'status': 'success', 'message': f'Cloud {title} has been created with node-id {node.id} in lab {lab.title}'})
+
+@csrf_exempt
+def remove_cloud_node(request: HttpRequest):
+    if request.method != "DELETE":
+        return JsonResponse({'status': 'error', 'message': "Only DELETE method required!"})
+    json_params = json.loads(request.body)
+    node_id = int(json_params["id"])
+    node = models.Node.objects.get(pk=node_id)
+    lab = node.lab
+    bridges = models.Bridge.objects.filter(Q(nodeA=node) | Q(nodeB=node))
+    
+    if bridges.count() != 0:
+        return JsonResponse({'status': 'error', 'message': "Delete BRIDGES!"})
+    
+    print("!!! ДОБАВИТЬ УДАЛЕНИЕ БРИДЖЕЙ С ВИРТУАЛКАМИ !!!")
+
+    node.delete()
+    return JsonResponse({'status': 'success', 'message': f'Cloud {node_id}:{node.title} deleted from lab {lab.title}'})
 
 @csrf_exempt
 def create_vm_by_ref(request: HttpRequest):
@@ -22,24 +85,29 @@ def create_vm_by_ref(request: HttpRequest):
         return JsonResponse({'status': 'error', 'message': "Only POST method required!"})
     json_params = json.loads(request.body)
 
-    lab_id = int(json_params["lab_id"])
+    lab_id = int(request.COOKIES['lab_id'])
     ref_id = int(json_params["reference_id"])
     new_domain = json_params["new_domain"]
+    pos_x = int(json_params["pos_x"])
+    pox_y = int(json_params["pos_y"])
     icon_path = json_params["icon"]
+    cpus = int(json_params["cpus"])
+    ram = int(json_params["ram"])
+    interfaces = int(json_params["interfaces"])
 
     lab = models.Lab.objects.get(pk=lab_id)
     reference = models.Reference.objects.get(pk=ref_id)
     
     # Выполнение команды клонирования виртуальной машины
-    result = kvm.clone_vm(reference.domain, new_domain)
+    vm_domain, result = kvm.clone_vm(reference.domain, new_domain)
 
     if result.returncode == 0:
-        node = models.Node(title=new_domain, lab=lab)
+        node = models.Node(title=new_domain, lab=lab, type=models.NodeType.VIRTUALMACHINE)
         node.save()
-        vm = models.VirtualMachine(node=node, domain=new_domain, reference=reference, isExist=True)
+        vm = models.VirtualMachine(node=node, domain=vm_domain, reference=reference, isExist=True)
         vm.save()
         # Если клонирование прошло успешно, вернуть статус 200 и сообщение об успешном клонировании
-        return JsonResponse({'status': 'success', 'message': f'VM {reference.domain} has been cloned to {new_domain} in lab {lab.title}'})
+        return JsonResponse({'status': 'success', 'message': f'VM {reference.domain} has been cloned to {vm_domain} in lab {lab.title}'})
     else:
         # Если произошла ошибка при клонировании, вернуть статус 500 и сообщение об ошибке
         return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
@@ -50,8 +118,13 @@ def delete_vm(request: HttpRequest):
         return JsonResponse({'status': 'error', 'message': "Only DELETE method required!"})
     json_params = json.loads(request.body)
     vm_id = int(json_params["id"])
-
     vm = models.VirtualMachine.objects.get(pk=vm_id)
+    bridges = models.Bridge.objects.filter(Q(nodeA=vm.node) | Q(nodeB=vm.node))
+
+    if bridges.count() != 0:
+        return JsonResponse({'status': 'error', 'message': "Delete BRIDGES!"})
+    print("!!! ДОБАВИТЬ УДАЛЕНИЕ БРИДЖЕЙ С ВИРТУАЛКАМИ !!!")
+
     result = kvm.delete_vm(vm.domain)
     print(result)
     if result.returncode == 0:
@@ -115,5 +188,22 @@ def forceoff_vm(request: HttpRequest):
     print(result)
     if result.returncode == 0:
         return JsonResponse({'status': 'success', 'message': f'VM {vm.domain} has been destroyed'})
+    else:
+        return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
+    
+@csrf_exempt   
+def set_vnc_port_vm(request: HttpRequest):
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': "Only POST method required!"})
+    
+    json_params = json.loads(request.body)
+    vm_id = int(json_params["id"])
+    vnc_port = int(json_params["port"])
+
+    vm = models.VirtualMachine.objects.get(pk=vm_id)
+    new_port, result = kvm.set_vnc_port(vm.domain, vnc_port)
+
+    if result.returncode == 0:
+        return JsonResponse({'status': 'success', 'message': f'VM {vm.domain} new VNC port {new_port}'})
     else:
         return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
