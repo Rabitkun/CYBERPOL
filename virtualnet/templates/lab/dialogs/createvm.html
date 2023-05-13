@@ -1,0 +1,32 @@
+<dialog class='labdialog' id="create-vm-dialog" node-x="0" node-y="0" is-confirmable='true' confirm-message='Создать виртуальную машину?'>
+    <div class='labdialog__component'>
+        <span>Название:</span>
+        <input type="text" class="create-vm-dialog-input-title" name="title" value="Новая машина" required></input>
+    </div>
+    <div class='labdialog__component'>
+        <span>Тип:</span>
+        <select class="create-vm-dialog-input-reference" name="reference">
+            <option value="option1">Опция 1</option>
+        </select>
+    </div>
+    <div class='labdialog__component'>
+        <span>Иконка:</span>
+        <select class="create-vm-dialog-input-icon" name="icon">
+            <option value="option1">Опция 1</option>
+        </select>
+    </div>
+    <div class='labdialog__component'>
+        <span>CPUs:</span>
+        <input type="number" class="create-vm-dialog-input-cpus" name="cpus" value="1" min="1" max="3" step="1"></input>
+    </div>
+    <div class='labdialog__component'>
+        <span>RAM(MIb):</span>
+        <input type="number" class="create-vm-dialog-input-ram" name="ram" value="128" min="128" max="2048" step="8"></input>
+    </div>
+    <div class='labdialog__component'>
+        <span>Кол-во интерфейсов:</span>
+        <input type="number" name="eth" class="create-vm-dialog-input-eth" value="2" min="2" max="20" step="1"></input>
+    </div>
+    <input type="button" class="labdialog__button-create" value="Создать" onclick="DialogsLab.CreateVmDialog._onAccept(this)">
+    <input type="button" class="labdialog__button-cancel" value="Отмена" onclick="document.getElementById('create-vm-dialog').close()">
+</dialog>

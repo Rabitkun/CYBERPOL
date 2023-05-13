@@ -27,6 +27,7 @@ class Node(models.Model):
         return self.title
 
 class Reference(models.Model):
+    title = models.CharField(max_length=255, null=True, unique=True, default='')
     domain = models.CharField(max_length=255, null=True, unique=True)
     storage = models.CharField(max_length=255, null=True)
 
@@ -58,6 +59,12 @@ class Bridge(models.Model):
     def getNetName(self):
         return str(self.id).zfill(14)
     
+    @staticmethod
+    def getLabBridges(lab):
+        bridges = Bridge.objects.all()
+        result = [bridge for bridge in bridges if bridge.nodeA.lab == lab]
+        return result
+
     def clean(self) -> None:
         if self.nodeA.lab != self.nodeB.lab:
             raise exs.ValidationError("Nodes must attend to the same lab!")

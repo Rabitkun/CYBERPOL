@@ -12,6 +12,8 @@ def lab_field(request: HttpRequest):
     lab_id = int(request.COOKIES['lab_id'])
     lab = models.Lab.objects.get(pk=lab_id)
     nodes = models.Node.objects.filter(lab=lab)
-    print(nodes)
-    
-    return render(request, "lab/lab_base.html", {"lab_title": lab.title})
+    bridges = models.Bridge.getLabBridges(lab)
+    for node in nodes:
+        print(node.iconPath)
+    print(bridges)
+    return render(request, "lab/lab_base.html", {"lab_title": lab.title, "nodes": nodes, "bridges": bridges})

@@ -1,10 +1,32 @@
-import subprocess
+import subprocess, os
 from subprocess import CompletedProcess
 from django.views.decorators.csrf import csrf_exempt
 from . import models, kvm
 from django.db.models import Q
 from django.http import JsonResponse, HttpRequest
 import json
+import urllib.parse
+
+@csrf_exempt
+def get_references_list(request: HttpRequest):
+    if request.method != "GET":
+        return JsonResponse({'status': 'error', 'message': "Only GET method required!"})
+    refs = models.Reference.objects.all()
+    response = {}
+    for ref in refs:
+        response[str(ref.pk)] = ref.title
+    return JsonResponse(response)
+
+@csrf_exempt
+def get_icons_list(request: HttpRequest):
+    if request.method != "GET":
+        return JsonResponse({'status': 'error', 'message': "Only GET method required!"})
+    icon_path = "virtualnet/static/micons"
+    filenames: list[str] = os.listdir(icon_path)
+    response = {}
+    for file in filenames:
+        response[file] = file
+    return JsonResponse(response)
 
 @csrf_exempt
 def get_vms_list(request: HttpRequest):
@@ -34,6 +56,7 @@ def get_node_params(request: HttpRequest):
     }
     if(node.type == models.NodeType.VIRTUALMACHINE):
         vm = models.VirtualMachine.objects.get(node=node)
+        response["vm_id"] = vm.pk
         response["reference"] = vm.reference.domain
         response["cpus"] = vm.cpus
         response["ram"] = vm.ramMB
@@ -70,10 +93,13 @@ def remove_cloud_node(request: HttpRequest):
     node = models.Node.objects.get(pk=node_id)
     lab = node.lab
     bridges = models.Bridge.objects.filter(Q(nodeA=node) | Q(nodeB=node))
-    
+    vm = models.VirtualMachine.objects.filter(node=node)
+
     if bridges.count() != 0:
         return JsonResponse({'status': 'error', 'message': "Delete BRIDGES!"})
-    
+    if node.type != models.NodeType.CLOUD:
+        return JsonResponse({'status': 'error', 'message': "NOT CLOUD!"})
+
     print("!!! ДОБАВИТЬ УДАЛЕНИЕ БРИДЖЕЙ С ВИРТУАЛКАМИ !!!")
 
     node.delete()
@@ -84,13 +110,13 @@ def create_vm_by_ref(request: HttpRequest):
     if request.method != "POST":
         return JsonResponse({'status': 'error', 'message': "Only POST method required!"})
     json_params = json.loads(request.body)
-
+    
     lab_id = int(request.COOKIES['lab_id'])
-    ref_id = int(json_params["reference_id"])
-    new_domain = json_params["new_domain"]
+    ref_id = int(json_params["reference"])
+    new_domain = json_params["title"]
     pos_x = int(json_params["pos_x"])
-    pox_y = int(json_params["pos_y"])
-    icon_path = json_params["icon"]
+    pos_y = int(json_params["pos_y"])
+    icon = json_params["icon"]
     cpus = int(json_params["cpus"])
     ram = int(json_params["ram"])
     interfaces = int(json_params["interfaces"])
@@ -103,11 +129,17 @@ def create_vm_by_ref(request: HttpRequest):
 
     if result.returncode == 0:
         node = models.Node(title=new_domain, lab=lab, type=models.NodeType.VIRTUALMACHINE)
+        node.posX = pos_x
+        node.posY = pos_y
+        node.iconPath = icon
         node.save()
         vm = models.VirtualMachine(node=node, domain=vm_domain, reference=reference, isExist=True)
+        vm.cpus = cpus
+        vm.ramMB = ram
+        vm.interfaces = interfaces
         vm.save()
         # Если клонирование прошло успешно, вернуть статус 200 и сообщение об успешном клонировании
-        return JsonResponse({'status': 'success', 'message': f'VM {reference.domain} has been cloned to {vm_domain} in lab {lab.title}'})
+        return JsonResponse({'status': 'success', 'message': f'VM {reference.domain} has been cloned to {vm_domain} in lab {lab.title}', "id": node.id})
     else:
         # Если произошла ошибка при клонировании, вернуть статус 500 и сообщение об ошибке
         return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
@@ -205,5 +237,5 @@ def set_vnc_port_vm(request: HttpRequest):
 
     if result.returncode == 0:
         return JsonResponse({'status': 'success', 'message': f'VM {vm.domain} new VNC port {new_port}'})
-    else:
-        return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
+    return JsonResponse({'status': 'error', 'message': result.stderr.decode()})
+    
